@@ -21,6 +21,8 @@ public class Vehicle extends SimulatedObject {
 	private int totalCO2;
 	private int totalDistance;
 	private int itineraryIndex;
+	private int currJunctionIndex;
+
 
 	Vehicle(String id, int maxSpeed, int contClass, List<Junction> itinerary) {
 		super(id);
@@ -42,6 +44,8 @@ public class Vehicle extends SimulatedObject {
 		this.totalDistance = 0;
 		this.road = null;
 		this.itineraryIndex = 0;
+		this.currJunctionIndex = 0;
+
 	}
 
 	// Métodos: setSpeed, setContaminationClass, advance, moveToNextRoad, report
