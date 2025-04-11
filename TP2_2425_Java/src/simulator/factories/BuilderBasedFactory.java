@@ -1,47 +1,46 @@
 package simulator.factories;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 import org.json.JSONObject;
 
+import simulator.model.Event;
+
 public class BuilderBasedFactory<T> implements Factory<T> {
 
-    private Map<String, Builder<T>> _builders;
-    private List<JSONObject> _buildersInfo;
+    private Map<String, Builder<T>> builders; // Mapa que relaciona el tipo de evento con su builder
+    private List<JSONObject> buildersInfo; // Información sobre los builders
 
-    public BuilderBasedFactory(List<Builder<T>> builders) {
-        _builders = new HashMap<>();
-        _buildersInfo = new ArrayList<>();
+    public BuilderBasedFactory(List<Builder<T>> buildersList) {
+        builders = new HashMap<>();
+        buildersInfo = new ArrayList<>();
 
-        for (Builder<T> b : builders) {
-            _builders.put(b.get_type_tag(), b);
-            _buildersInfo.add(b.get_info());
+        // Agregar todos los builders al mapa y la info de los builders a la lista
+        for (Builder<T> builder : buildersList) {
+            builders.put(builder.get_type_tag(), builder);
+            buildersInfo.add(builder.get_info());
         }
     }
 
     @Override
-    public T create_instance(JSONObject info) {
-        if (info == null)
-            throw new IllegalArgumentException("'info' cannot be null");
+    public T create_instance(JSONObject data) {
+        if (data == null)
+            throw new IllegalArgumentException("Data cannot be null");
 
-        String type = info.getString("type");
-        JSONObject data = info.has("data") ? info.getJSONObject("data") : new JSONObject();
+        String type = data.getString("type"); // Obtener el tipo de evento
+        Builder<T> builder = builders.get(type); // Buscar el builder correspondiente
 
-        Builder<T> b = _builders.get(type);
-        if (b == null)
+        if (builder == null)
             throw new IllegalArgumentException("Unknown type: " + type);
 
-        return b.create_instance(data);
+        return builder.create_instance(data); // Crear y devolver el evento
     }
 
     @Override
     public List<JSONObject> get_info() {
-        return Collections.unmodifiableList(_buildersInfo);
+        return buildersInfo; // Devuelve la información de todos los builders
     }
-
-
 }
