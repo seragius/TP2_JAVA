@@ -1,6 +1,8 @@
 package simulator.factories;
 
 import org.json.JSONObject;
+
+import simulator.model.Event;
 public abstract class Builder<T> {
 	  private String _type_tag;
 	  private String _desc;
@@ -34,5 +36,7 @@ public abstract class Builder<T> {
 	    return _desc;
 	  }
 
-	  protected abstract T create_instance(JSONObject data);
+	  protected abstract T createInstance(JSONObject data);
+
+
 	}

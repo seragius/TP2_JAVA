@@ -11,7 +11,7 @@ public class MoveAllStrategyBuilder extends Builder<DequeuingStrategy> {
     }
 
     @Override
-    protected DequeuingStrategy create_instance(JSONObject data) {
+    protected DequeuingStrategy createInstance(JSONObject data) {
         // La estructura JSON "data" se omite ya que no contiene información
         return new MoveAllStrategy();
     }

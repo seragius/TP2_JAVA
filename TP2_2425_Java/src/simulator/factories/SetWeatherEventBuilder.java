@@ -18,7 +18,7 @@ public class SetWeatherEventBuilder extends Builder<Event> {
     }
 
     @Override
-    public Event create_instance(JSONObject data) {
+    public Event createInstance(JSONObject data) {
         if (data == null)
             throw new IllegalArgumentException("Data for SetWeatherEvent is null.");
 

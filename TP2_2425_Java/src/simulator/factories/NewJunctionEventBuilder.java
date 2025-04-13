@@ -18,7 +18,7 @@ public class NewJunctionEventBuilder extends Builder<Event> {
     }
 
     @Override
-    protected Event create_instance(JSONObject data) {
+    protected Event createInstance(JSONObject data) {
         String id = data.getString("id");
         int time = data.getInt("time");
         JSONArray coor = data.getJSONArray("coor");
@@ -34,4 +34,5 @@ public class NewJunctionEventBuilder extends Builder<Event> {
 
         return new NewJunctionEvent(time, id, lss, dqs, x, y);
     }
+
 }

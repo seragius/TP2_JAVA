@@ -16,7 +16,7 @@ public class NewVehicleEventBuilder extends Builder<Event> {
     }
 
     @Override
-    public Event create_instance(JSONObject data) {
+    public Event createInstance(JSONObject data) {
         int time = data.getInt("time");
         String id = data.getString("id");
         int maxspeed = data.getInt("maxspeed");

@@ -11,7 +11,7 @@ abstract class NewRoadEventBuilder extends Builder<Event> {
     }
 
     @Override
-    protected Event create_instance(JSONObject data) {
+    protected Event createInstance(JSONObject data) {
         String id = data.getString("id");
         String src = data.getString("src");
         String dest = data.getString("dest");
