@@ -1,83 +1,90 @@
 package simulator.model;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 public abstract class Road extends SimulatedObject {
 
-	protected Junction srcJunction;
-	protected Junction destJunction;
-	protected int length;
-	protected int maxSpeed;
-	protected int speedLimit;
-	protected int contLimit;
-	protected Weather weather;
-	protected int totalCO2;
-
-	protected List<Vehicle> vehicles;
+	protected Junction _srcJunc;
+	protected Junction _destJunc;
+	protected int _length;
+	protected int _maxSpeed;
+	protected int _speedLimit;
+	protected int _contLimit;
+	protected Weather _weather;
+	protected int _totalCO2;
+	protected List<Vehicle> _vehicles;
 
 	Road(String id, Junction srcJunc, Junction destJunc, int maxSpeed, int contLimit, int length, Weather weather) {
 		super(id);
 
+		if (maxSpeed <= 0)
+			throw new IllegalArgumentException("Max speed must be positive");
+		if (contLimit < 0)
+			throw new IllegalArgumentException("Contamination limit cannot be negative");
+		if (length <= 0)
+			throw new IllegalArgumentException("Length must be positive");
 		if (srcJunc == null || destJunc == null)
-			throw new IllegalArgumentException("Cruces no pueden ser null");
-		if (maxSpeed <= 0 || contLimit < 0 || length <= 0 || weather == null)
-			throw new IllegalArgumentException("Parámetros inválidos en carretera");
+			throw new IllegalArgumentException("Junctions cannot be null");
+		if (weather == null)
+			throw new IllegalArgumentException("Weather cannot be null");
 
-		this.srcJunction = srcJunc;
-		this.destJunction = destJunc;
-		this.maxSpeed = maxSpeed;
-		this.speedLimit = maxSpeed;
-		this.contLimit = contLimit;
-		this.length = length;
-		this.weather = weather;
-		this.totalCO2 = 0;
+		_srcJunc = srcJunc;
+		_destJunc = destJunc;
+		_length = length;
+		_maxSpeed = maxSpeed;
+		_speedLimit = maxSpeed;
+		_contLimit = contLimit;
+		_weather = weather;
+		_totalCO2 = 0;
+		_vehicles = new ArrayList<>();
 
-		this.vehicles = new ArrayList<>();
-
-		srcJunc.addOutGoingRoad(this);
-		destJunction.addIncommingRoad(this);
+		_srcJunc.addOutGoingRoad(this);
+		_destJunc.addIncommingRoad(this);
 	}
 
 	void enter(Vehicle v) {
 		if (v.getLocation() != 0 || v.getSpeed() != 0)
-			throw new IllegalArgumentException("Vehículo no válido para entrar");
-
-		vehicles.add(v);
+			throw new IllegalArgumentException("Vehicle must enter at location 0 with speed 0");
+		_vehicles.add(v);
 	}
 
 	void exit(Vehicle v) {
-		vehicles.remove(v);
+		_vehicles.remove(v);
 	}
 
 	void setWeather(Weather w) {
 		if (w == null)
-			throw new IllegalArgumentException("Weather no puede ser null");
-
-		this.weather = w;
+			throw new IllegalArgumentException("Weather cannot be null");
+		_weather = w;
 	}
 
 	void addContamination(int c) {
 		if (c < 0)
-			throw new IllegalArgumentException("La contaminación no puede ser negativa");
-
-		this.totalCO2 += c;
+			throw new IllegalArgumentException("Contamination cannot be negative");
+		_totalCO2 += c;
 	}
+
+	public abstract void reduceTotalContamination();
+
+	public abstract void updateSpeedLimit();
+
+	public abstract int calculateVehicleSpeed(Vehicle v);
 
 	@Override
 	void advance(int currTime) {
 		reduceTotalContamination();
 		updateSpeedLimit();
 
-		for (Vehicle v : vehicles) {
-			int newSpeed = calculateVehicleSpeed(v);
-			v.setSpeed(newSpeed);
+		for (Vehicle v : _vehicles) {
+			v.setSpeed(calculateVehicleSpeed(v));
 			v.advance(currTime);
 		}
 
-		vehicles.sort((v1, v2) -> Integer.compare(v2.getLocation(), v1.getLocation()));
+		_vehicles.sort((v1, v2) -> v2.getLocation() - v1.getLocation());
 	}
 
 	@Override
@@ -85,60 +92,53 @@ public abstract class Road extends SimulatedObject {
 		JSONObject jo = new JSONObject();
 
 		jo.put("id", _id);
-		jo.put("speedlimit", speedLimit);
-		jo.put("weather", weather.toString());
-		jo.put("co2", totalCO2);
+		jo.put("speedlimit", _speedLimit);
+		jo.put("weather", _weather.toString());
+		jo.put("co2", _totalCO2);
 
-		JSONArray ja = new JSONArray();
-		for (Vehicle v : vehicles) {
-			ja.put(v.getId());
-		}
-		jo.put("vehicles", ja);
+		List<String> vs = new ArrayList<>();
+		for (Vehicle v : _vehicles)
+			vs.add(v.getId());
+
+		jo.put("vehicles", vs);
 
 		return jo;
 	}
 
-	// Métodos abstractos que implementarán CityRoad e InterCityRoad
-	abstract void reduceTotalContamination();
-
-	abstract void updateSpeedLimit();
-
-	abstract int calculateVehicleSpeed(Vehicle v);
-
-	// Getters públicos
+	// Public getters
 	public int getLength() {
-		return length;
+		return _length;
 	}
 
 	public Junction getDest() {
-		return destJunction;
+		return _destJunc;
 	}
 
 	public Junction getSrc() {
-		return srcJunction;
+		return _srcJunc;
 	}
 
 	public Weather getWeather() {
-		return weather;
+		return _weather;
 	}
 
 	public int getContLimit() {
-		return contLimit;
+		return _contLimit;
 	}
 
 	public int getMaxSpeed() {
-		return maxSpeed;
+		return _maxSpeed;
 	}
 
 	public int getTotalCO2() {
-		return totalCO2;
+		return _totalCO2;
 	}
 
 	public int getSpeedLimit() {
-		return speedLimit;
+		return _speedLimit;
 	}
 
 	public List<Vehicle> getVehicles() {
-		return Collections.unmodifiableList(vehicles);
+		return Collections.unmodifiableList(_vehicles);
 	}
 }

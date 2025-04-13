@@ -10,4 +10,6 @@ public interface LightSwitchingStrategy {
 		int lastSwitchingTime,
 		int currTime
 	);
+	
+	
 }

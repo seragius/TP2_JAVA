@@ -1,6 +1,13 @@
 package simulator.launcher;
 
 import java.io.IOException;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -9,105 +16,121 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
-import simulator.factories.Factory;
-import simulator.model.Event;
+import simulator.control.Controller;
+import simulator.factories.*;
+import simulator.model.*;
 
 public class Main {
 
-	private static String _inFile = null;
-	private static String _outFile = null;
-	private static Factory<Event> _eventsFactory = null;
+    private static String _inFile = null;
+    private static String _outFile = null;
+    private static Factory<Event> _eventsFactory = null;
+    private static int _timeLimit = 300;  // Default value if -t argument is not provided
 
-	private static void parseArgs(String[] args) {
+    private static void parseArgs(String[] args) {
+        Options cmdLineOptions = buildOptions();
 
-		// define the valid command line options
-		//
-		Options cmdLineOptions = buildOptions();
+        CommandLineParser parser = new DefaultParser();
+        try {
+            CommandLine line = parser.parse(cmdLineOptions, args);
+            parseHelpOption(line, cmdLineOptions);
+            parseInFileOption(line);
+            parseOutFileOption(line);
+            parseTimeLimitOption(line);
+        } catch (ParseException e) {
+            System.err.println(e.getLocalizedMessage());
+            System.exit(1);
+        }
+    }
 
-		// parse the command line as provided in args
-		//
-		CommandLineParser parser = new DefaultParser();
-		try {
-			CommandLine line = parser.parse(cmdLineOptions, args);
-			parseHelpOption(line, cmdLineOptions);
-			parseInFileOption(line);
-			parseOutFileOption(line);
+    private static Options buildOptions() {
+        Options cmdLineOptions = new Options();
 
-			// if there are some remaining arguments, then something wrong is
-			// provided in the command line!
-			//
-			String[] remaining = line.getArgs();
-			if (remaining.length > 0) {
-				String error = "Illegal arguments:";
-				for (String o : remaining)
-					error += (" " + o);
-				throw new ParseException(error);
-			}
+        cmdLineOptions.addOption(Option.builder("i").longOpt("input").hasArg().desc("Events input file").build());
+        cmdLineOptions.addOption(Option.builder("o").longOpt("output").hasArg().desc("Output file, where reports are written.").build());
+        cmdLineOptions.addOption(Option.builder("t").longOpt("timeLimit").hasArg().desc("Number of simulation steps").build());
+        cmdLineOptions.addOption(Option.builder("h").longOpt("help").desc("Print this message").build());
 
-		} catch (ParseException e) {
-			System.err.println(e.getLocalizedMessage());
-			System.exit(1);
-		}
+        return cmdLineOptions;
+    }
 
-	}
+    private static void parseHelpOption(CommandLine line, Options cmdLineOptions) {
+        if (line.hasOption("h")) {
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp(Main.class.getCanonicalName(), cmdLineOptions, true);
+            System.exit(0);
+        }
+    }
 
-	private static Options buildOptions() {
-		Options cmdLineOptions = new Options();
+    private static void parseInFileOption(CommandLine line) throws ParseException {
+        _inFile = line.getOptionValue("i");
+        if (_inFile == null) {
+            throw new ParseException("An events file is missing");
+        }
+    }
 
-		cmdLineOptions.addOption(Option.builder("i").longOpt("input").hasArg().desc("Events input file").build());
-		cmdLineOptions.addOption(
-				Option.builder("o").longOpt("output").hasArg().desc("Output file, where reports are written.").build());
-		cmdLineOptions.addOption(Option.builder("h").longOpt("help").desc("Print this message").build());
+    private static void parseOutFileOption(CommandLine line) throws ParseException {
+        _outFile = line.getOptionValue("o");
+    }
 
-		return cmdLineOptions;
-	}
+    private static void parseTimeLimitOption(CommandLine line) {
+        if (line.hasOption("t")) {
+            _timeLimit = Integer.parseInt(line.getOptionValue("t"));
+        }
+    }
 
-	private static void parseHelpOption(CommandLine line, Options cmdLineOptions) {
-		if (line.hasOption("h")) {
-			HelpFormatter formatter = new HelpFormatter();
-			formatter.printHelp(Main.class.getCanonicalName(), cmdLineOptions, true);
-			System.exit(0);
-		}
-	}
+    private static void initFactories() {
+        // Light Switching Strategies
+        List<Builder<LightSwitchingStrategy>> lsbs = new ArrayList<>();
+        lsbs.add(new RoundRobinStrategyBuilder());
+        lsbs.add(new MostCrowdedStrategyBuilder());
+        Factory<LightSwitchingStrategy> lssFactory = new BuilderBasedFactory<>(lsbs);
 
-	private static void parseInFileOption(CommandLine line) throws ParseException {
-		_inFile = line.getOptionValue("i");
-		if (_inFile == null) {
-			throw new ParseException("An events file is missing");
-		}
-	}
+        // Dequeuing Strategies
+        List<Builder<DequeuingStrategy>> dqbs = new ArrayList<>();
+        dqbs.add(new MoveFirstStrategyBuilder());
+        dqbs.add(new MoveAllStrategyBuilder());
+        Factory<DequeuingStrategy> dqsFactory = new BuilderBasedFactory<>(dqbs);
 
-	private static void parseOutFileOption(CommandLine line) throws ParseException {
-		_outFile = line.getOptionValue("o");
-	}
+        // Event Builders
+        List<Builder<Event>> eventBuilders = new ArrayList<>();
+        eventBuilders.add(new NewJunctionEventBuilder(lssFactory, dqsFactory));
+        eventBuilders.add(new NewCityRoadEventBuilder());
+        eventBuilders.add(new NewInterCityRoadEventBuilder());
+        eventBuilders.add(new NewVehicleEventBuilder());
+        eventBuilders.add(new SetWeatherEventBuilder());
+        eventBuilders.add(new SetContClassEventBuilder());
+
+        _eventsFactory = new BuilderBasedFactory<>(eventBuilders);
+    }
 
 
-	private static void initFactories() {
-	}
+    private static void startBatchMode() throws IOException {
+        // Create InputStream and OutputStream
+        InputStream in = new FileInputStream(_inFile);
+        OutputStream out = (_outFile == null) ? System.out : new FileOutputStream(_outFile);
 
-	private static void startBatchMode() throws IOException {
-	}
+        // Create simulator and controller
+        TrafficSimulator simulator = new TrafficSimulator();
+        Controller controller = new Controller(simulator, _eventsFactory);
 
-	private static void start(String[] args) throws IOException {
-		initFactories();
-		parseArgs(args);
-		startBatchMode();
-	}
+        // Load events and run the simulation
+        controller.loadEvents(in);
+        in.close();
+        controller.run(_timeLimit, out);
+    }
 
-	// example command lines:
-	//
-	// -i resources/examples/ex1.json
-	// -i resources/examples/ex1.json -t 300
-	// -i resources/examples/ex1.json -o resources/tmp/ex1.out.json
-	// --help
+    public static void start(String[] args) throws IOException {
+        initFactories();
+        parseArgs(args);
+        startBatchMode();
+    }
 
-	public static void main(String[] args) {
-		try {
-			start(args);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-	}
-
+    public static void main(String[] args) {
+        try {
+            start(args);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }

@@ -1,12 +1,14 @@
 package simulator.model;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MoveFirstStrategy implements DequeuingStrategy {
-
-	@Override
-	public List<Vehicle> dequeue(List<Vehicle> q) {
-		if (q.isEmpty()) return Collections.emptyList();
-		return Collections.singletonList(q.get(0));
-	}
+    @Override
+    public List<Vehicle> dequeue(List<Vehicle> q) {
+        List<Vehicle> res = new ArrayList<>();
+        if (!q.isEmpty())
+            res.add(q.get(0));
+        return res;
+    }
 }

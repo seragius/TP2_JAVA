@@ -1,119 +1,116 @@
 package simulator.model;
 
 import java.util.*;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-class RoadMap {
+public class RoadMap {
 
-	private List<Junction> junctions;
-	private List<Road> roads;
-	private List<Vehicle> vehicles;
+	private List<Junction> _junctions;
+	private List<Road> _roads;
+	private List<Vehicle> _vehicles;
 
-	private Map<String, Junction> junctionMap;
-	private Map<String, Road> roadMap;
-	private Map<String, Vehicle> vehicleMap;
+	private Map<String, Junction> _junctionsMap;
+	private Map<String, Road> _roadsMap;
+	private Map<String, Vehicle> _vehiclesMap;
 
 	RoadMap() {
-		junctions = new ArrayList<>();
-		roads = new ArrayList<>();
-		vehicles = new ArrayList<>();
+		_junctions = new ArrayList<>();
+		_roads = new ArrayList<>();
+		_vehicles = new ArrayList<>();
 
-		junctionMap = new HashMap<>();
-		roadMap = new HashMap<>();
-		vehicleMap = new HashMap<>();
+		_junctionsMap = new HashMap<>();
+		_roadsMap = new HashMap<>();
+		_vehiclesMap = new HashMap<>();
 	}
 
 	void addJunction(Junction j) {
-		if (junctionMap.containsKey(j.getId()))
+		if (_junctionsMap.containsKey(j.getId())) {
 			throw new IllegalArgumentException("Duplicate junction id: " + j.getId());
-
-		junctions.add(j);
-		junctionMap.put(j.getId(), j);
+		}
+		_junctions.add(j);
+		_junctionsMap.put(j.getId(), j);
 	}
 
 	void addRoad(Road r) {
-		if (roadMap.containsKey(r.getId()))
+		if (_roadsMap.containsKey(r.getId())) {
 			throw new IllegalArgumentException("Duplicate road id: " + r.getId());
-
-		if (!junctionMap.containsValue(r.getSrc()) || !junctionMap.containsValue(r.getDest()))
-			throw new IllegalArgumentException("Invalid junctions for road: " + r.getId());
-
-		roads.add(r);
-		roadMap.put(r.getId(), r);
+		}
+		if (!_junctionsMap.containsValue(r.getSrc()) || !_junctionsMap.containsValue(r.getDest())) {
+			throw new IllegalArgumentException("Road connects to unknown junctions.");
+		}
+		_roads.add(r);
+		_roadsMap.put(r.getId(), r);
 	}
 
 	void addVehicle(Vehicle v) {
-		if (vehicleMap.containsKey(v.getId()))
+		if (_vehiclesMap.containsKey(v.getId())) {
 			throw new IllegalArgumentException("Duplicate vehicle id: " + v.getId());
-
-		// Validar que todos los tramos del itinerario existen
-		List<Junction> it = v.getItinerary();
-		for (int i = 0; i < it.size() - 1; i++) {
-			Junction from = it.get(i);
-			Junction to = it.get(i + 1);
-			if (from.roadTo(to) == null)
-				throw new IllegalArgumentException("No road from " + from.getId() + " to " + to.getId());
 		}
-
-		vehicles.add(v);
-		vehicleMap.put(v.getId(), v);
+		List<Junction> itinerary = v.getItinerary();
+		for (int i = 0; i < itinerary.size() - 1; i++) {
+			if (itinerary.get(i).roadTo(itinerary.get(i + 1)) == null) {
+				throw new IllegalArgumentException("Invalid itinerary: no road from " +
+					itinerary.get(i).getId() + " to " + itinerary.get(i + 1).getId());
+			}
+		}
+		_vehicles.add(v);
+		_vehiclesMap.put(v.getId(), v);
 	}
 
 	public Junction getJunction(String id) {
-		return junctionMap.get(id);
+		return _junctionsMap.get(id);
 	}
 
 	public Road getRoad(String id) {
-		return roadMap.get(id);
+		return _roadsMap.get(id);
 	}
 
 	public Vehicle getVehicle(String id) {
-		return vehicleMap.get(id);
+		return _vehiclesMap.get(id);
 	}
 
 	public List<Junction> getJunctions() {
-		return Collections.unmodifiableList(junctions);
+		return Collections.unmodifiableList(_junctions);
 	}
 
 	public List<Road> getRoads() {
-		return Collections.unmodifiableList(roads);
+		return Collections.unmodifiableList(_roads);
 	}
 
 	public List<Vehicle> getVehicles() {
-		return Collections.unmodifiableList(vehicles);
+		return Collections.unmodifiableList(_vehicles);
 	}
 
 	void reset() {
-		junctions.clear();
-		roads.clear();
-		vehicles.clear();
+		_junctions.clear();
+		_roads.clear();
+		_vehicles.clear();
 
-		junctionMap.clear();
-		roadMap.clear();
-		vehicleMap.clear();
+		_junctionsMap.clear();
+		_roadsMap.clear();
+		_vehiclesMap.clear();
 	}
 
 	public JSONObject report() {
 		JSONObject jo = new JSONObject();
+		JSONArray jaJunctions = new JSONArray();
+		JSONArray jaRoads = new JSONArray();
+		JSONArray jaVehicles = new JSONArray();
 
-		// Cruces
-		jo.put("junctions", junctions.stream()
-			.map(Junction::report)
-			.collect(org.json.JSONArray::new, JSONArray::put, JSONArray::putAll));
+		for (Junction j : _junctions) {
+			jaJunctions.put(j.report());
+		}
+		for (Road r : _roads) {
+			jaRoads.put(r.report());
+		}
+		for (Vehicle v : _vehicles) {
+			jaVehicles.put(v.report());
+		}
 
-		// Carreteras
-		jo.put("roads", roads.stream()
-			.map(Road::report)
-			.collect(org.json.JSONArray::new, JSONArray::put, JSONArray::putAll));
-
-		// Vehículos
-		jo.put("vehicles", vehicles.stream()
-			.map(Vehicle::report)
-			.collect(org.json.JSONArray::new, JSONArray::put, JSONArray::putAll));
-
+		jo.put("junctions", jaJunctions);
+		jo.put("roads", jaRoads);
+		jo.put("vehicles", jaVehicles);
 		return jo;
 	}
-
 }

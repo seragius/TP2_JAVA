@@ -1,5 +1,6 @@
 package simulator.model;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -7,168 +8,118 @@ import org.json.JSONObject;
 
 public class Vehicle extends SimulatedObject {
 
-	enum VehicleStatus {
-		PENDING, TRAVELING, WAITING, ARRIVED
-	}
+    private int _maxSpeed;
+    private int _speed;
+    private int _contClass;
+    private List<Junction> _itinerary;
+    private VehicleStatus _status;
+    private Road _road;
+    private int _location;
+    private int _totalCO2;
+    private int _totalDistance;
+    private int _currItineraryIndex;
 
-	private List<Junction> itinerary;
-	private int maxSpeed;
-	private int speed;
-	private VehicleStatus status;
-	private Road road;
-	private int location;
-	private int contClass;
-	private int totalCO2;
-	private int totalDistance;
-	private int itineraryIndex;
-	private int currJunctionIndex;
+    Vehicle(String id, int maxSpeed, int contClass, List<Junction> itinerary) {
+        super(id);
 
+        if (maxSpeed <= 0)
+            throw new IllegalArgumentException("Max speed must be positive");
+        if (contClass < 0 || contClass > 10)
+            throw new IllegalArgumentException("Contamination class must be between 0 and 10");
+        if (itinerary == null || itinerary.size() < 2)
+            throw new IllegalArgumentException("Itinerary must have at least two junctions");
 
-	Vehicle(String id, int maxSpeed, int contClass, List<Junction> itinerary) {
-		super(id);
+        _maxSpeed = maxSpeed;
+        _contClass = contClass;
+        _itinerary = Collections.unmodifiableList(new ArrayList<>(itinerary));
+        _status = VehicleStatus.PENDING;
+        _speed = 0;
+        _location = 0;
+        _totalCO2 = 0;
+        _totalDistance = 0;
+        _currItineraryIndex = 0;
+        _road = null;
+    }
 
-		if (maxSpeed <= 0)
-			throw new IllegalArgumentException("maxSpeed debe ser > 0");
-		if (contClass < 0 || contClass > 10)
-			throw new IllegalArgumentException("contClass debe estar entre 0 y 10");
-		if (itinerary == null || itinerary.size() < 2)
-			throw new IllegalArgumentException("El itinerario debe tener al menos 2 cruces");
+    void setSpeed(int s) {
+        if (s < 0) throw new IllegalArgumentException("Speed cannot be negative");
+        _speed = Math.min(s, _maxSpeed);
+    }
 
-		this.maxSpeed = maxSpeed;
-		this.contClass = contClass;
-		this.itinerary = Collections.unmodifiableList(itinerary);
-		this.status = VehicleStatus.PENDING;
-		this.speed = 0;
-		this.location = 0;
-		this.totalCO2 = 0;
-		this.totalDistance = 0;
-		this.road = null;
-		this.itineraryIndex = 0;
-		this.currJunctionIndex = 0;
+    void setContaminationClass(int c) {
+        if (c < 0 || c > 10) throw new IllegalArgumentException("Contamination class must be between 0 and 10");
+        _contClass = c;
+    }
 
-	}
+    void moveToNextRoad() {
+        if (_status == VehicleStatus.ARRIVED)
+            throw new IllegalStateException("Vehicle has already arrived");
+        if (_status != VehicleStatus.PENDING && _status != VehicleStatus.WAITING)
+            throw new IllegalStateException("Vehicle not in a valid state to move");
 
-	// Métodos: setSpeed, setContaminationClass, advance, moveToNextRoad, report
-	// y getters públicos que definiremos después
-	
-	void setSpeed(int s) {
-		if (s < 0)
-			throw new IllegalArgumentException("La velocidad no puede ser negativa");
+        if (_status == VehicleStatus.WAITING)
+            _road.exit(this);
 
-		if (status != VehicleStatus.TRAVELING) {
-			this.speed = 0;
-		} else {
-			this.speed = Math.min(s, maxSpeed);
-		}
-	}
+        if (_currItineraryIndex == _itinerary.size() - 1) {
+            _road = null;
+            _status = VehicleStatus.ARRIVED;
+        } else {
+            Junction src = _itinerary.get(_currItineraryIndex);
+            Junction dest = _itinerary.get(_currItineraryIndex + 1);
+            _road = src.roadTo(dest);
+            _location = 0;
+            _speed = 0;
+            _road.enter(this);
+            _status = VehicleStatus.TRAVELING;
+            _currItineraryIndex++;
+        }
+    }
 
-	void setContaminationClass(int c) {
-		if (c < 0 || c > 10)
-			throw new IllegalArgumentException("El grado de contaminación debe estar entre 0 y 10");
+    @Override
+    void advance(int currTime) {
+        if (_status != VehicleStatus.TRAVELING) return;
 
-		this.contClass = c;
-	}
+        int prevLocation = _location;
+        _location = Math.min(_location + _speed, _road.getLength());
+        int delta = _location - prevLocation;
+        int c = delta * _contClass;
 
-	@Override
-	void advance(int currTime) {
-		if (status != VehicleStatus.TRAVELING) return;
+        _totalCO2 += c;
+        _road.addContamination(c);
+        _totalDistance += delta;
 
-		int oldLocation = location;
-		location = Math.min(location + speed, road.getLength());
+        if (_location >= _road.getLength()) {
+            _status = VehicleStatus.WAITING;
+            _speed = 0;
+            _road.getDest().enter(this);
+        }
+    }
 
-		int distanceTravelled = location - oldLocation;
-		int emittedCO2 = distanceTravelled * contClass;
+    @Override
+    public JSONObject report() {
+        JSONObject jo = new JSONObject();
+        jo.put("id", _id);
+        jo.put("speed", _speed);
+        jo.put("distance", _totalDistance);
+        jo.put("co2", _totalCO2);
+        jo.put("class", _contClass);
+        jo.put("status", _status);
 
-		totalCO2 += emittedCO2;
-		totalDistance += distanceTravelled;
-		road.addContamination(emittedCO2);
+        if (_status == VehicleStatus.TRAVELING || _status == VehicleStatus.WAITING) {
+            jo.put("road", _road.getId());
+            jo.put("location", _location);
+        }
 
-		if (location >= road.getLength()) {
-			speed = 0;
-			status = VehicleStatus.WAITING;
-			road.getDest().enter(this);
-		}
-	}
-	
-	void moveToNextRoad() {
-		if (status != VehicleStatus.PENDING && status != VehicleStatus.WAITING)
-			throw new IllegalStateException("El vehículo debe estar en estado PENDING o WAITING");
+        return jo;
+    }
 
-		if (status == VehicleStatus.WAITING)
-			road.exit(this); // salimos de la carretera actual
-
-		if (currJunctionIndex >= itinerary.size() - 1) {
-			status = VehicleStatus.ARRIVED;
-			road = null;
-		} else {
-			Junction from = itinerary.get(currJunctionIndex);
-			Junction to = itinerary.get(currJunctionIndex + 1);
-			currJunctionIndex++;
-
-			road = from.roadTo(to);
-			location = 0;
-			speed = 0;
-			road.enter(this);
-			status = VehicleStatus.TRAVELING;
-		}
-	}
-	
-	@Override
-	public JSONObject report() {
-		JSONObject jo = new JSONObject();
-
-		jo.put("id", _id);
-		jo.put("speed", speed);
-		jo.put("distance", totalDistance);
-		jo.put("co2", totalCO2);
-		jo.put("class", contClass);
-		jo.put("status", status.toString());
-
-		if (status == VehicleStatus.TRAVELING || status == VehicleStatus.WAITING) {
-			jo.put("road", road.getId());
-			jo.put("location", location);
-		}
-
-		return jo;
-	}
-	
-	public int getLocation() {
-		return location;
-	}
-
-	public int getSpeed() {
-		return speed;
-	}
-
-	public int getMaxSpeed() {
-		return maxSpeed;
-	}
-
-	public int getContClass() {
-		return contClass;
-	}
-
-	public VehicleStatus getStatus() {
-		return status;
-	}
-
-	public int getTotalCO2() {
-		return totalCO2;
-	}
-
-	public int getTotalDistance() {
-		return totalDistance;
-	}
-
-	public List<Junction> getItinerary() {
-		return itinerary;
-	}
-
-	public Road getRoad() {
-		return road;
-	}
-
-
-
-
+    // Public getters
+    public int getLocation() { return _location; }
+    public int getSpeed() { return _speed; }
+    public int getMaxSpeed() { return _maxSpeed; }
+    public int getContClass() { return _contClass; }
+    public VehicleStatus getStatus() { return _status; }
+    public int getTotalCO2() { return _totalCO2; }
+    public List<Junction> getItinerary() { return _itinerary; }
+    public Road getRoad() { return _road; }
 }
